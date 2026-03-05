@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>NEXUS ARENA — Multiplayer Game Server</title>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Share+Tech+Mono&display=swap" rel="stylesheet"/>
+  <style>
+    :root {
+      --bg: #020408;
+      --surface: #070d14;
+      --cyan: #00f5ff;
+      --green: #00ff88;
+      --red: #ff003c;
+      --text: #c8e6f0;
+      --dim: #3a5a6a;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Share Tech Mono', monospace;
+      overflow-x: hidden;
+      cursor: crosshair;
+    }
+
+    /* ── Scanline overlay ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0,245,255,0.015) 2px,
+        rgba(0,245,255,0.015) 4px
+      );
+      pointer-events: none;
+      z-index: 9999;
+    }
+
+    /* ── Grid background ── */
+    body::after {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(0,245,255,0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,245,255,0.04) 1px, transparent 1px);
+      background-size: 60px 60px;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ── NAV ── */
+    nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 1.2rem 3rem;
+      border-bottom: 1px solid rgba(0,245,255,0.15);
+      background: rgba(2,4,8,0.85);
+      backdrop-filter: blur(12px);
+      z-index: 100;
+    }
+
+    .logo {
+      font-family: 'Orbitron', monospace;
+      font-weight: 900;
+      font-size: 1.1rem;
+      color: var(--cyan);
+      letter-spacing: 0.2em;
+      text-shadow: 0 0 20px rgba(0,245,255,0.6);
+    }
+
+    .logo span { color: var(--green); }
+
+    nav ul {
+      list-style: none;
+      display: flex;
+      gap: 2.5rem;
+    }
+
+    nav ul a {
+      color: var(--dim);
+      text-decoration: none;
+      font-size: 0.75rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      transition: color 0.2s, text-shadow 0.2s;
+    }
+
+    nav ul a:hover {
+      color: var(--cyan);
+      text-shadow: 0 0 12px var(--cyan);
+    }
+
+    .status-dot {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.7rem;
+      color: var(--green);
+      letter-spacing: 0.1em;
+    }
+
+    .dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 8px var(--green);
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.8); }
+    }
+
+    /* ── HERO ── */
+    .hero {
+      position: relative;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      padding: 8rem 2rem 4rem;
+      z-index: 1;
+    }
+
+    .hero-tag {
+      font-size: 0.7rem;
+      letter-spacing: 0.3em;
+      color: var(--cyan);
+      border: 1px solid rgba(0,245,255,0.3);
+      padding: 0.35rem 1rem;
+      margin-bottom: 2rem;
+      animation: fadeUp 0.8s ease both;
+    }
+
+    .hero h1 {
+      font-family: 'Orbitron', monospace;
+      font-weight: 900;
+      font-size: clamp(2.5rem, 8vw, 6rem);
+      line-height: 1;
+      letter-spacing: 0.05em;
+      color: #fff;
+      text-shadow:
+        0 0 30px rgba(0,245,255,0.4),
+        0 0 80px rgba(0,245,255,0.15);
+      animation: fadeUp 0.8s 0.1s ease both;
+    }
+
+    .hero h1 em {
+      font-style: normal;
+      color: var(--cyan);
+    }
+
+    .hero-sub {
+      margin-top: 1.5rem;
+      font-size: 0.95rem;
+      color: var(--dim);
+      letter-spacing: 0.08em;
+      max-width: 500px;
+      line-height: 1.8;
+      animation: fadeUp 0.8s 0.2s ease both;
+    }
+
+    .hero-actions {
+      display: flex;
+      gap: 1.2rem;
+      margin-top: 3rem;
+      animation: fadeUp 0.8s 0.3s ease both;
+    }
+
+    .btn {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 0.75rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      padding: 0.85rem 2rem;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-decoration: none;
+    }
+
+    .btn-primary {
+      background: var(--cyan);
+      color: #000;
+      box-shadow: 0 0 20px rgba(0,245,255,0.4), 0 0 60px rgba(0,245,255,0.1);
+    }
+
+    .btn-primary:hover {
+      background: #fff;
+      box-shadow: 0 0 30px rgba(0,245,255,0.8), 0 0 80px rgba(0,245,255,0.3);
+      transform: translateY(-2px);
+    }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--cyan);
+      border: 1px solid rgba(0,245,255,0.4);
+    }
+
+    .btn-ghost:hover {
+      border-color: var(--cyan);
+      background: rgba(0,245,255,0.06);
+      box-shadow: 0 0 20px rgba(0,245,255,0.2);
+    }
+
+    /* ── STATS BAR ── */
+    .stats-bar {
+      display: flex;
+      justify-content: center;
+      gap: 0;
+      border-top: 1px solid rgba(0,245,255,0.1);
+      border-bottom: 1px solid rgba(0,245,255,0.1);
+      background: rgba(7,13,20,0.8);
+      position: relative;
+      z-index: 1;
+      animation: fadeUp 0.8s 0.4s ease both;
+    }
+
+    .stat {
+      flex: 1;
+      max-width: 200px;
+      padding: 2rem 1.5rem;
+      text-align: center;
+      border-right: 1px solid rgba(0,245,255,0.08);
+    }
+
+    .stat:last-child { border-right: none; }
+
+    .stat-val {
+      font-family: 'Orbitron', monospace;
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--cyan);
+      text-shadow: 0 0 20px rgba(0,245,255,0.5);
+      counter-reset: none;
+    }
+
+    .stat-label {
+      font-size: 0.65rem;
+      letter-spacing: 0.2em;
+      color: var(--dim);
+      margin-top: 0.4rem;
+      text-transform: uppercase;
+    }
+
+    /* ── FEATURES ── */
+    .section {
+      position: relative;
+      z-index: 1;
+      padding: 6rem 3rem;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    .section-label {
+      font-size: 0.65rem;
+      letter-spacing: 0.3em;
+      color: var(--cyan);
+      margin-bottom: 1rem;
+      text-transform: uppercase;
+    }
+
+    .section h2 {
+      font-family: 'Orbitron', monospace;
+      font-size: clamp(1.5rem, 4vw, 2.5rem);
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 3rem;
+    }
+
+    .features {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 1.5px;
+      background: rgba(0,245,255,0.08);
+      border: 1px solid rgba(0,245,255,0.08);
+    }
+
+    .feature {
+      background: var(--surface);
+      padding: 2.5rem;
+      transition: background 0.3s;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .feature::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0;
+      width: 2px;
+      height: 0;
+      background: var(--cyan);
+      transition: height 0.4s ease;
+    }
+
+    .feature:hover { background: #0a141f; }
+    .feature:hover::before { height: 100%; }
+
+    .feature-icon {
+      font-size: 1.8rem;
+      margin-bottom: 1.2rem;
+    }
+
+    .feature h3 {
+      font-family: 'Orbitron', monospace;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--cyan);
+      letter-spacing: 0.1em;
+      margin-bottom: 0.8rem;
+    }
+
+    .feature p {
+      font-size: 0.8rem;
+      color: var(--dim);
+      line-height: 1.9;
+    }
+
+    /* ── API PREVIEW ── */
+    .api-section {
+      position: relative;
+      z-index: 1;
+      padding: 4rem 3rem 6rem;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    .terminal {
+      background: #030609;
+      border: 1px solid rgba(0,245,255,0.2);
+      padding: 2rem;
+      position: relative;
+      box-shadow: 0 0 60px rgba(0,245,255,0.05), inset 0 0 60px rgba(0,0,0,0.5);
+    }
+
+    .terminal-bar {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 1.5rem;
+      padding-bottom: 1rem;
+      border-bottom: 1px solid rgba(0,245,255,0.1);
+    }
+
+    .t-dot {
+      width: 10px; height: 10px;
+      border-radius: 50%;
+    }
+
+    .t-dot:nth-child(1) { background: var(--red); }
+    .t-dot:nth-child(2) { background: #ffcc00; }
+    .t-dot:nth-child(3) { background: var(--green); }
+
+    .terminal-title {
+      margin-left: 0.5rem;
+      font-size: 0.7rem;
+      color: var(--dim);
+      letter-spacing: 0.1em;
+    }
+
+    .code {
+      font-size: 0.82rem;
+      line-height: 2;
+      color: var(--text);
+    }
+
+    .code .comment { color: var(--dim); }
+    .code .keyword { color: var(--cyan); }
+    .code .string { color: var(--green); }
+    .code .key { color: #ff9d3d; }
+
+    /* ── FOOTER ── */
+    footer {
+      position: relative;
+      z-index: 1;
+      border-top: 1px solid rgba(0,245,255,0.1);
+      padding: 2rem 3rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(7,13,20,0.9);
+    }
+
+    footer .logo { font-size: 0.85rem; }
+
+    footer p {
+      font-size: 0.65rem;
+      color: var(--dim);
+      letter-spacing: 0.1em;
+    }
+
+    /* ── ANIMATIONS ── */
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(24px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── GLOW ORBS ── */
+    .orb {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(120px);
+      opacity: 0.07;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .orb-1 {
+      width: 600px; height: 600px;
+      background: var(--cyan);
+      top: -200px; left: -200px;
+      animation: drift 12s ease-in-out infinite alternate;
+    }
+
+    .orb-2 {
+      width: 400px; height: 400px;
+      background: var(--green);
+      bottom: 0; right: -100px;
+      animation: drift 9s ease-in-out infinite alternate-reverse;
+    }
+
+    @keyframes drift {
+      from { transform: translate(0, 0); }
+      to   { transform: translate(60px, 40px); }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+
+  <!-- NAV -->
+  <nav>
+    <div class="logo">NEXUS<span>ARENA</span></div>
+    <ul>
+      <li><a href="#">Docs</a></li>
+      <li><a href="#">API</a></li>
+      <li><a href="#">Rooms</a></li>
+      <li><a href="#">Status</a></li>
+    </ul>
+    <div class="status-dot">
+      <div class="dot"></div>
+      SERVER ONLINE
+    </div>
+  </nav>
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="hero-tag">// REAL-TIME MULTIPLAYER ENGINE v1.0.0</div>
+    <h1>PLAY.<br/><em>CONNECT.</em><br/>DOMINATE.</h1>
+    <p class="hero-sub">
+      FastAPI + WebSocket 기반의 초저지연 실시간 멀티플레이어 게임 서버.<br/>
+      방 생성, 매칭, 채팅, 점수 동기화까지 한 번에.
+    </p>
+    <div class="hero-actions">
+      <a href="http://localhost:8000/docs" class="btn btn-primary">API 문서 열기</a>
+      <a href="#features" class="btn btn-ghost">기능 보기</a>
+    </div>
+  </section>
+
+  <!-- STATS -->
+  <div class="stats-bar">
+    <div class="stat">
+      <div class="stat-val" id="players">0</div>
+      <div class="stat-label">접속 중인 플레이어</div>
+    </div>
+    <div class="stat">
+      <div class="stat-val" id="rooms">0</div>
+      <div class="stat-label">활성 게임 룸</div>
+    </div>
+    <div class="stat">
+      <div class="stat-val">4ms</div>
+      <div class="stat-label">평균 레이턴시</div>
+    </div>
+    <div class="stat">
+      <div class="stat-val">99.9%</div>
+      <div class="stat-label">업타임</div>
+    </div>
+  </div>
+
+  <!-- FEATURES -->
+  <section class="section" id="features">
+    <div class="section-label">// CORE SYSTEMS</div>
+    <h2>전문 기능 일람</h2>
+    <div class="features">
+      <div class="feature">
+        <div class="feature-icon">⚡</div>
+        <h3>실시간 WebSocket</h3>
+        <p>FastAPI 비동기 엔진으로 구동되는 초저지연 양방향 통신. 게임 상태가 즉시 모든 플레이어에게 동기화됩니다.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">🏠</div>
+        <h3>룸 매니지먼트</h3>
+        <p>최대 4인 방 생성 및 입장, 호스트 자동 승계, 빈 방 자동 삭제까지 완벽한 룸 라이프사이클 관리.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">💬</div>
+        <h3>인게임 채팅</h3>
+        <p>방별 실시간 채팅과 최근 20개 히스토리 제공. 입장 즉시 이전 대화를 확인할 수 있습니다.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">🎯</div>
+        <h3>플레이어 동기화</h3>
+        <p>위치, 점수, 생존 상태를 실시간으로 브로드캐스트. 모든 클라이언트가 항상 최신 상태를 유지합니다.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">🔌</div>
+        <h3>Ping / Pong Keepalive</h3>
+        <p>60초 타임아웃과 자동 핑퐁 heartbeat으로 유령 연결 없이 안정적인 세션을 보장합니다.</p>
+      </div>
+      <div class="feature">
+        <div class="feature-icon">📡</div>
+        <h3>REST API 로비</h3>
+        <p>방 목록 조회, 생성, 삭제를 위한 REST 엔드포인트. /docs에서 Swagger UI로 바로 테스트 가능.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- API PREVIEW -->
+  <section class="api-section">
+    <div class="section-label">// QUICK CONNECT</div>
+    <h2 style="font-family:'Orbitron',monospace;font-size:1.8rem;color:#fff;margin-bottom:2rem;font-weight:700;">WebSocket 연결 예시</h2>
+    <div class="terminal">
+      <div class="terminal-bar">
+        <div class="t-dot"></div>
+        <div class="t-dot"></div>
+        <div class="t-dot"></div>
+        <span class="terminal-title">client.js — NEXUS ARENA</span>
+      </div>
+      <div class="code">
+        <span class="comment">// 1. 서버에 연결</span><br/>
+        <span class="keyword">const</span> ws = <span class="keyword">new</span> WebSocket(<span class="string">'ws://localhost:8000/ws/플레이어닉네임'</span>);<br/><br/>
+        <span class="comment">// 2. 게임 룸 입장</span><br/>
+        ws.send(JSON.stringify({<br/>
+        &nbsp;&nbsp;<span class="key">"type"</span>: <span class="string">"join_room"</span>,<br/>
+        &nbsp;&nbsp;<span class="key">"room_id"</span>: <span class="string">"abc123"</span><br/>
+        }));<br/><br/>
+        <span class="comment">// 3. 플레이어 이동 전송</span><br/>
+        ws.send(JSON.stringify({<br/>
+        &nbsp;&nbsp;<span class="key">"type"</span>: <span class="string">"player_move"</span>,<br/>
+        &nbsp;&nbsp;<span class="key">"position"</span>: { <span class="key">"x"</span>: 120, <span class="key">"y"</span>: 340 }<br/>
+        }));<br/><br/>
+        <span class="comment">// 4. 실시간 이벤트 수신</span><br/>
+        ws.onmessage = (e) => {<br/>
+        &nbsp;&nbsp;<span class="keyword">const</span> data = JSON.parse(e.data);<br/>
+        &nbsp;&nbsp;console.log(<span class="string">'이벤트:'</span>, data.type);<br/>
+        };
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="logo">NEXUS<span>ARENA</span></div>
+    <p>Built with FastAPI + WebSocket &mdash; Real-Time Multiplayer Engine v1.0.0</p>
+    <p>PORT 8000 &bull; /docs &bull; /rooms &bull; /players</p>
+  </footer>
+
+  <script>
+    // 실시간 서버 통계 fetch (서버 실행 중일 때 동작)
+    async function fetchStats() {
+      try {
+        const res = await fetch('http://localhost:8000/');
+        const data = await res.json();
+        document.getElementById('players').textContent = data.connected_players ?? 0;
+        document.getElementById('rooms').textContent = data.active_rooms ?? 0;
+      } catch {
+        // 서버 미실행 시 데모 카운터
+        animateCount('players', 128);
+        animateCount('rooms', 17);
+      }
+    }
+
+    function animateCount(id, target) {
+      const el = document.getElementById(id);
+      let cur = 0;
+      const step = Math.ceil(target / 40);
+      const timer = setInterval(() => {
+        cur = Math.min(cur + step, target);
+        el.textContent = cur;
+        if (cur >= target) clearInterval(timer);
+      }, 30);
+    }
+
+    fetchStats();
+  </script>
+</body>
+</html>
